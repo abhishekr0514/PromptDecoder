@@ -1,0 +1,280 @@
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* 🔥 THEME VARIABLES */
+:root {
+    --bg: #030712;
+    --surface: rgba(10, 20, 40, 0.85);
+    --border: rgba(0, 255, 157, 0.15);
+
+    --green: #00ff9d;
+    --yellow: #ffb800;
+    --red: #ff4f6e;
+
+    --text: #c8d8f0;
+    --muted: #4a6080;
+
+    --font-mono: 'Share Tech Mono', monospace;
+    --font-display: 'Orbitron', sans-serif;
+    --font-body: 'Rajdhani', sans-serif;
+}
+
+/* 🔥 BACKGROUND */
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* 🔥 SCANLINE EFFECT */
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg,
+            transparent,
+            transparent 2px,
+            rgba(0, 255, 157, 0.01) 2px,
+            rgba(0, 255, 157, 0.01) 4px);
+    pointer-events: none;
+    z-index: 9999;
+}
+
+/* 🔥 APP LAYER */
+.app-wrapper {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+}
+
+/* ───────── HEADER ───────── */
+.site-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    padding: 0 2rem;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(3, 7, 18, 0.9);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+}
+
+.logo {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 900;
+    color: var(--green);
+    text-shadow: 0 0 15px rgba(0, 255, 157, 0.6);
+}
+
+.logo span {
+    color: #fff;
+}
+
+.header-stats {
+    display: flex;
+    gap: 2rem;
+}
+
+.stat-pill {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.stat-val {
+    font-family: var(--font-display);
+    font-weight: bold;
+}
+
+.stat-key {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+}
+
+/* ───────── INTRO ───────── */
+.intro-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.intro-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 2.5rem;
+    border-radius: 12px;
+    max-width: 500px;
+    text-align: center;
+    backdrop-filter: blur(20px);
+}
+
+.intro-title {
+    font-family: var(--font-display);
+    font-size: 2.2rem;
+    margin-bottom: 0.5rem;
+}
+
+.intro-title .accent {
+    color: var(--green);
+}
+
+.intro-sub {
+    font-family: var(--font-mono);
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+}
+
+.name-input {
+    width: 100%;
+    padding: 0.8rem;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: #fff;
+    margin-bottom: 1rem;
+}
+
+.start-btn {
+    width: 100%;
+    padding: 0.9rem;
+    background: var(--green);
+    border: none;
+    font-family: var(--font-display);
+    font-weight: bold;
+    cursor: pointer;
+}
+
+/* ───────── GAME ───────── */
+.game-layout {
+    max-width: 900px;
+    margin: auto;
+    padding: 2rem;
+}
+
+.cards-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* ───────── CARD ───────── */
+.question-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 1.5rem;
+    border-radius: 10px;
+    backdrop-filter: blur(20px);
+}
+
+.card-correct {
+    border-color: var(--green);
+}
+
+.card-wrong {
+    border-color: var(--red);
+}
+
+/* ───────── INPUT ───────── */
+.prompt-input {
+    width: 100%;
+    padding: 0.8rem;
+    background: rgba(0, 255, 157, 0.05);
+    border: 1px solid var(--border);
+    color: #fff;
+    margin-top: 0.5rem;
+}
+
+/* ───────── BUTTON ───────── */
+.submit-btn {
+    margin-top: 1rem;
+    padding: 0.7rem 1.5rem;
+    background: var(--green);
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-display);
+    font-weight: bold;
+}
+
+/* ───────── DONE SCREEN ───────── */
+.done-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.done-card {
+    background: var(--surface);
+    border: 1px solid var(--green);
+    padding: 2rem;
+    border-radius: 12px;
+    text-align: center;
+}
+
+/* 🔥 GLITCH EFFECT */
+.glitch-wrapper {
+    position: relative;
+}
+
+.glitch-wrapper::before,
+.glitch-wrapper::after {
+    content: attr(data-text);
+    position: absolute;
+    left: 0;
+    top: 0;
+    opacity: 0.6;
+}
+
+.glitch-wrapper::before {
+    color: red;
+    transform: translate(-2px, 0);
+}
+
+.glitch-wrapper::after {
+    color: cyan;
+    transform: translate(2px, 0);
+}
+
+.code-block {
+  background: #0f172a;
+  color: #00ff9d;
+  padding: 12px;
+  border-radius: 10px;
+  overflow-x: auto;
+  font-family: "Fira Code", monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  border: 1px solid rgba(0, 255, 157, 0.2);
+}
+
+.rule-item {
+  font-family: "Fira Code", monospace;
+  letter-spacing: 0.3px;
+}
+
+/* ───────── SPACE TWEAKS ───────── */
+.expected-output {
+    margin-top: 1.5rem;
+}
+
+.input-section {
+    margin-top: 1.5rem;
+}
+
+.score-item {
+    margin-bottom: 0.5rem;
+}
