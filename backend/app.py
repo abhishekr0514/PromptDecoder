@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, Response
+from flask import Flask, Response, jsonify, render_template, request
 from flask_cors import CORS
 import json
 
@@ -13,35 +13,24 @@ from openai import OpenAI
 app = Flask(__name__)
 CORS(app)
 
-# 🔥 Ollama (OpenAI-compatible)
 client = OpenAI(
     base_url="http://localhost:11434/v1",
     api_key="ollama"
 )
 
-# 🔹 Load embedding model
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
-# 🔹 Track attempts per question
-# attempt_tracker = {q["id"]: 0 for q in questions}
-
-# 🔒 Track user progress (per IP for now)
 user_progress = {}
 
-# ==============================
-# 🔹 Semantic Similarity Function
-# ==============================
+
 def check_prompt(original, user):
     emb1 = model.encode(original, convert_to_tensor=True)
     emb2 = model.encode(user, convert_to_tensor=True)
 
     score = util.cos_sim(emb1, emb2).item()
-    return (score + 1) / 2  # Normalize
+    return (score + 1) / 2
 
 
-# ==============================
-# 🔹 Keyword Matching
-# ==============================
 def keyword_score(keywords, user_prompt):
     user_words = set(user_prompt.lower().split())
     keyword_words = set(kw.lower() for kw in keywords)
@@ -50,10 +39,8 @@ def keyword_score(keywords, user_prompt):
     return matches / len(keyword_words) if keyword_words else 0
 
 
-# ==============================
-# 🔹 Structure Matching
-# ==============================
 STOPWORDS = {"a", "the", "is", "in", "on", "of", "and", "to", "how"}
+
 
 def structure_score(original, user):
     original_words = set(w for w in original.lower().split() if w not in STOPWORDS)
@@ -65,16 +52,14 @@ def structure_score(original, user):
     overlap = len(original_words & user_words)
     return overlap / len(original_words)
 
-# ==============================
-# 🔹 AI Hint (Ollama)
-# ==============================
+
 def generate_hint(original, user, attempts):
     difficulty_levels = ["very vague", "moderate", "clear"]
     level = min(attempts, 2)
 
     try:
         response = client.chat.completions.create(
-            model="qwen2.5:1.5b",  # ✅ CHANGED HERE
+            model="qwen2.5:1.5b",
             temperature=0.7,
             messages=[
                 {
@@ -104,9 +89,6 @@ Hidden prompt: {original}
         return "Try refining the intent and structure of your prompt."
 
 
-# ==============================
-# 🔹 GET QUESTIONS API (UPDATED)
-# ==============================
 @app.route("/api/questions", methods=["GET"])
 def get_questions():
     round_param = request.args.get("round", "1")
@@ -117,7 +99,6 @@ def get_questions():
     elif round_param == "2":
         key = request.args.get("key")
 
-        # 🔒 simple secret key check
         if key != "ROUND2_UNLOCK":
             return jsonify({
                 "status": "locked",
@@ -143,15 +124,10 @@ def get_questions():
     })
 
 
-# ==============================
-# 🔹 SUBMIT ANSWERS API (UPDATED)
-# ==============================
 @app.route("/api/submit", methods=["POST"])
 def submit():
+    user_id = request.headers.get("X-User-Id", "default_user")
 
-    user_id = request.headers.get("X-User-Id", "default_user")  # simple user tracking
-
-    # Initialize user progress
     if user_id not in user_progress:
         user_progress[user_id] = 1
 
@@ -162,17 +138,12 @@ def submit():
 
     data = request.json or {}
 
-    # 🔥 Loop only over submitted keys (q1, q2, etc.)
     for key, user_prompt in data.items():
-
-        # Extract question id (q1 → 1)
         try:
             qid = int(key.replace("q", ""))
-        except:
+        except Exception:
             continue
 
-        # 🚨 BLOCK if not the current allowed question
-        # 🚨 BLOCK only if skipping ahead
         if qid > current_allowed_q:
             results.append({
                 "question_id": qid,
@@ -183,22 +154,18 @@ def submit():
 
         user_prompt = user_prompt.strip()
 
-        # 🚨 Skip empty input
         if not user_prompt:
             results.append({
-            "question_id": qid,
-            "status": "empty",
-            "message": "Prompt cannot be empty"
+                "question_id": qid,
+                "status": "empty",
+                "message": "Prompt cannot be empty"
             })
             continue
 
-        # Find the question
         q = next((q for q in questions if q["id"] == qid), None)
         if not q:
             continue
 
-        # 🔹 Semantic score
-        # 🔹 Hybrid scoring
         semantic = check_prompt(q["original_prompt"], user_prompt)
         keyword = keyword_score(q["keywords"], user_prompt)
         structure = structure_score(q["original_prompt"], user_prompt)
@@ -219,8 +186,6 @@ def submit():
             output = q["expected_output"]
             feedback = None
             total_score += final_score
-            # 🔓 Unlock next question
-            # 🔓 Unlock next question safely
             if qid == current_allowed_q:
                 user_progress[user_id] = current_allowed_q + 1
         else:
@@ -228,10 +193,10 @@ def submit():
             message = "Try again"
             output = None
             feedback = generate_hint(
-            q["original_prompt"],
-            user_prompt,
-            0
-        )
+                q["original_prompt"],
+                user_prompt,
+                0
+            )
 
         results.append({
             "question_id": qid,
@@ -242,14 +207,10 @@ def submit():
                 "keyword": round(keyword, 2),
                 "structure": round(structure, 2),
                 "final_semantic": round(final_semantic, 2),
-
-                # 🔥 IMPORTANT (for frontend compatibility)
                 "semantic_score": round(final_semantic, 2),
                 "semantic_points": semantic_points,
                 "difficulty_points": difficulty_points,
                 "final_score": round(final_score, 2),
-
-                # keep old naming too (optional)
                 "final": round(final_score, 2)
             },
             "status": status,
@@ -265,9 +226,6 @@ def submit():
     })
 
 
-# ==============================
-# 🔹 DOWNLOAD RESULTS AS JSON
-# ==============================
 @app.route("/api/download-results", methods=["POST"])
 def download_results():
     response = submit().get_json()
@@ -283,21 +241,10 @@ def download_results():
     )
 
 
-
-# ==============================
-# 🔹 HEALTH CHECK
-# ==============================
 @app.route("/")
 def home():
-    return jsonify({
-        "status": "running",
-        "message": "PromptDecoder API is running 🚀"
-    })
+    return render_template("index.html")
 
 
-# ==============================
-# 🔹 RUN SERVER
-# ==============================
 if __name__ == "__main__":
     app.run(debug=True)
-    CORS(app)

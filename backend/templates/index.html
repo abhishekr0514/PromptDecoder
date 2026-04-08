@@ -1,9 +1,492 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Test</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PromptDecoder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #030712;
+      --surface: rgba(10, 20, 40, 0.85);
+      --border: rgba(0, 255, 157, 0.15);
+      --green: #00ff9d;
+      --yellow: #ffb800;
+      --red: #ff4f6e;
+      --orange: #ff7c3a;
+      --text: #c8d8f0;
+      --muted: #4a6080;
+      --font-mono: 'Share Tech Mono', monospace;
+      --font-display: 'Orbitron', sans-serif;
+      --font-body: 'Rajdhani', sans-serif;
+      --shadow-green: 0 0 24px rgba(0, 255, 157, 0.12);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; }
+    body {
+      background: radial-gradient(circle at top, rgba(0, 255, 157, 0.06), transparent 30%), var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    body::after {
+      content: ""; position: fixed; inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 157, 0.012) 2px, rgba(0, 255, 157, 0.012) 4px);
+      pointer-events: none; z-index: 9999;
+    }
+    button, input, textarea { font: inherit; }
+    button { transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease; }
+    button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 0 18px rgba(0, 255, 157, 0.24); }
+    button:disabled { cursor: not-allowed; opacity: 0.65; }
+    .particle-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+    .app-wrapper { position: relative; z-index: 1; min-height: 100vh; }
+    .site-header {
+      position: sticky; top: 0; z-index: 100; padding: 0 2rem; min-height: 64px; display: flex; align-items: center;
+      justify-content: space-between; background: rgba(3, 7, 18, 0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border);
+    }
+    .logo { font-family: var(--font-display); font-size: 1.3rem; font-weight: 900; color: var(--green); text-shadow: 0 0 15px rgba(0, 255, 157, 0.6); }
+    .logo span { color: #fff; }
+    .glitch-wrapper { position: relative; display: inline-block; }
+    .glitch-wrapper::before, .glitch-wrapper::after { content: attr(data-text); position: absolute; left: 0; top: 0; opacity: 0.6; pointer-events: none; }
+    .glitch-wrapper::before { color: #ff4f6e; transform: translate(-2px, 0); }
+    .glitch-wrapper::after { color: #31d0ff; transform: translate(2px, 0); }
+    .header-stats { display: flex; align-items: flex-end; gap: 1.5rem; }
+    .stat-pill { display: flex; flex-direction: column; align-items: flex-end; gap: 0.1rem; }
+    .stat-val { font-family: var(--font-display); font-size: 1.02rem; font-weight: 700; line-height: 1; }
+    .stat-key { font-family: var(--font-mono); font-size: 0.65rem; color: var(--muted); letter-spacing: 0.12em; }
+    .progress-bar-header, .level-bar-bg {
+      width: 140px; height: 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.06); overflow: hidden;
+    }
+    .progress-bar-fill, .level-bar-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #00ff9d, #82ffc9); transition: width 0.3s ease; }
+    .intro-screen, .done-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+    .intro-card, .done-card {
+      width: min(100%, 620px); background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 2.5rem; text-align: center; backdrop-filter: blur(20px); box-shadow: var(--shadow-green);
+    }
+    .intro-icon, .done-icon {
+      display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 50%; background: rgba(0,255,157,0.08); border: 1px solid rgba(0,255,157,0.2); font-size: 1.8rem; margin-bottom: 1.2rem;
+    }
+    .intro-title, .done-title, .game-title { font-family: var(--font-display); letter-spacing: 0.04em; }
+    .intro-title { font-size: clamp(2rem, 4vw, 2.7rem); margin-bottom: 0.55rem; }
+    .intro-title .accent, .game-title .accent, .done-title { color: var(--green); }
+    .intro-sub, .done-sub { font-family: var(--font-mono); color: var(--muted); margin-bottom: 1.5rem; letter-spacing: 0.08em; font-size: 0.86rem; }
+    .intro-desc { line-height: 1.6; font-size: 1.04rem; color: #dde8fa; margin-bottom: 1.5rem; }
+    .rules-grid { display: grid; gap: 0.75rem; text-align: left; margin-bottom: 1rem; }
+    .rule-item {
+      display: flex; align-items: center; gap: 0.7rem; padding: 0.8rem 0.95rem; border-radius: 10px; background: rgba(0,255,157,0.04); border: 1px solid rgba(0,255,157,0.1); font-family: var(--font-mono); font-size: 0.82rem; letter-spacing: 0.03em;
+    }
+    .rule-icon { color: var(--green); }
+    .name-input, .prompt-input {
+      width: 100%; padding: 0.9rem 1rem; border-radius: 10px; border: 1px solid var(--border); background: rgba(0,255,157,0.05); color: #fff; outline: none;
+    }
+    .name-input::placeholder, .prompt-input::placeholder { color: #6f85a5; }
+    .name-input:focus, .prompt-input:focus { border-color: rgba(0,255,157,0.5); box-shadow: 0 0 0 3px rgba(0,255,157,0.08); }
+    .prompt-input { min-height: 96px; resize: vertical; margin-top: 0.55rem; }
+    .start-btn, .submit-btn, .replay-btn { border: none; border-radius: 10px; font-family: var(--font-display); font-weight: 700; letter-spacing: 0.05em; cursor: pointer; }
+    .start-btn, .replay-btn { width: 100%; padding: 0.95rem 1rem; margin-top: 1rem; background: var(--green); color: #04130d; }
+    .game-layout { max-width: 920px; margin: 0 auto; padding: 2rem; }
+    .game-hero { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; margin-bottom: 1.5rem; }
+    .game-title { font-size: clamp(1.8rem, 4vw, 2.5rem); color: #fff; }
+    .player-tag { font-family: var(--font-mono); color: var(--muted); letter-spacing: 0.1em; text-align: right; }
+    .player-tag span { color: var(--green); }
+    .error-box, .locked-box, .loading-box { border-radius: 12px; padding: 1rem 1.1rem; margin-bottom: 1.3rem; font-family: var(--font-mono); font-size: 0.86rem; }
+    .error-box { background: rgba(255,79,110,0.1); border: 1px solid rgba(255,79,110,0.3); color: #ff4f6e; }
+    .locked-box, .loading-box { text-align: center; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); color: var(--muted); }
+    .cards-stack { display: flex; flex-direction: column; gap: 1.5rem; }
+    .question-card {
+      background: var(--surface); border: 1px solid var(--border); padding: 1.5rem; border-radius: 14px; backdrop-filter: blur(20px); box-shadow: var(--shadow-green); animation: fadeUp 0.45s ease both;
+    }
+    .card-correct { border-color: rgba(0,255,157,0.5); }
+    .card-wrong { border-color: rgba(255,79,110,0.45); }
+    .card-header, .card-footer, .score-row { display: flex; justify-content: space-between; gap: 1rem; }
+    .card-header { align-items: center; margin-bottom: 1rem; }
+    .card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+    .q-number, .difficulty-badge, .score-badge, .result-badge, .attempt-info { font-family: var(--font-mono); font-size: 0.8rem; letter-spacing: 0.08em; }
+    .q-number, .score-badge, .attempt-info, .result-badge, .difficulty-badge { padding: 0.35rem 0.65rem; border-radius: 999px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); }
+    .difficulty-badge { text-transform: uppercase; }
+    .expected-output, .input-section, .result-section { margin-top: 1.3rem; }
+    .output-label, .input-label { display: flex; align-items: center; gap: 0.55rem; font-family: var(--font-mono); font-size: 0.76rem; color: var(--muted); letter-spacing: 0.12em; margin-bottom: 0.7rem; }
+    .label-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--yellow); box-shadow: 0 0 10px rgba(255,184,0,0.45); }
+    .output-text, .success-output, .hint-box { border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); background: rgba(3,9,20,0.68); padding: 1rem; }
+    .output-text { line-height: 1.55; font-size: 1rem; color: #edf4ff; white-space: pre-wrap; word-break: break-word; }
+    .code-block { background: #0f172a; color: var(--green); padding: 12px; border-radius: 10px; overflow-x: auto; font-family: Consolas, 'Courier New', monospace; font-size: 13px; line-height: 1.5; border: 1px solid rgba(0,255,157,0.2); }
+    .result-section { display: grid; gap: 1rem; }
+    .score-row { align-items: center; }
+    .score-ring { flex: 0 0 90px; width: 90px; height: 90px; }
+    .score-details { flex: 1; display: grid; gap: 0.5rem; }
+    .score-item { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.98rem; }
+    .score-label { color: #9db1cf; }
+    .score-value { font-family: var(--font-mono); }
+    .level-label { font-family: var(--font-mono); font-size: 0.76rem; color: var(--muted); margin-bottom: 0.35rem; letter-spacing: 0.08em; }
+    .hint-box { display: flex; align-items: flex-start; gap: 0.75rem; color: #dfe9fa; line-height: 1.55; }
+    .hint-icon { color: var(--yellow); }
+    .warning-stack { display: flex; flex-direction: column; gap: 0.35rem; color: var(--red); font-size: 0.8rem; font-family: var(--font-mono); }
+    .warning-note { color: rgba(255,79,110,0.8); font-size: 0.75rem; font-style: italic; }
+    .success-output { border-color: rgba(0,255,157,0.2); }
+    .unlocked-text { color: #f8fffd; line-height: 1.55; white-space: pre-wrap; }
+    .card-footer { align-items: center; margin-top: 1rem; }
+    .submit-btn { min-width: 160px; padding: 0.8rem 1rem; background: var(--green); color: #04130d; }
+    .btn-disabled { background: rgba(0,255,157,0.2); color: #cbffe8; }
+    .btn-loading { display: inline-flex; gap: 0.25rem; align-items: center; justify-content: center; }
+    .btn-loading span { width: 6px; height: 6px; border-radius: 50%; background: #04130d; animation: blink 1s infinite ease-in-out; }
+    .btn-loading span:nth-child(2) { animation-delay: 0.15s; }
+    .btn-loading span:nth-child(3) { animation-delay: 0.3s; }
+    .done-card { border-color: rgba(0,255,157,0.45); }
+    .final-score-display { font-family: var(--font-display); font-size: clamp(3rem, 8vw, 4.5rem); color: var(--green); text-shadow: 0 0 18px rgba(0,255,157,0.35); line-height: 1; margin: 0.4rem 0; }
+    .final-score-label { font-family: var(--font-mono); letter-spacing: 0.12em; color: var(--muted); margin-bottom: 1.3rem; }
+    .done-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+    .done-stat { padding: 1rem; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); }
+    .done-stat .val { font-family: var(--font-display); font-size: 1.5rem; color: #fff; margin-bottom: 0.2rem; }
+    .done-stat .key { font-family: var(--font-mono); color: var(--muted); font-size: 0.72rem; letter-spacing: 0.08em; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes blink { 0%, 80%, 100% { opacity: 0.3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }
+    @media (max-width: 820px) {
+      .site-header, .game-layout, .intro-screen, .done-screen { padding-left: 1rem; padding-right: 1rem; }
+      .site-header { align-items: flex-start; flex-direction: column; gap: 0.8rem; padding-top: 0.9rem; padding-bottom: 0.9rem; }
+      .header-stats, .game-hero, .card-header, .score-row, .card-footer { flex-direction: column; align-items: stretch; }
+      .player-tag { text-align: left; }
+      .progress-bar-header, .level-bar-bg { width: 100%; }
+      .done-stats { grid-template-columns: 1fr; }
+      .submit-btn { width: 100%; }
+    }
+  </style>
 </head>
 <body>
-    <h1>Flask is working 🚀</h1>
+  <canvas id="particle-canvas" class="particle-canvas"></canvas>
+  <div id="app" class="app-wrapper"></div>
+  <script>
+    const API_BASE = "";
+    const TOTAL_QUESTIONS = 12;
+    const DIFFICULTY_CONFIG = {
+      easy: { color: "#00ff9d", glow: "rgba(0,255,157,0.4)", icon: "?" },
+      medium: { color: "#ffb800", glow: "rgba(255,184,0,0.4)", icon: "?" },
+      hard: { color: "#ff4f6e", glow: "rgba(255,79,110,0.4)", icon: "?" },
+      extreme: { color: "#ff3cac", glow: "rgba(255,60,172,0.4)", icon: "?" },
+      ultimate: { color: "#784ba0", glow: "rgba(120,75,160,0.4)", icon: "?" }
+    };
+    const LEVEL_CONFIG = {
+      Perfect: { color: "#00ff9d", width: "100%" },
+      Good: { color: "#ffb800", width: "75%" },
+      Close: { color: "#ff7c3a", width: "50%" },
+      Far: { color: "#ff4f6e", width: "20%" }
+    };
+    const state = {
+      userId: getOrCreateUserId(),
+      phase: "intro",
+      playerName: loadStorage("player_name", ""),
+      questions: [],
+      results: {},
+      prompts: {},
+      totalScore: 0,
+      loadingId: null,
+      round2Unlocked: false,
+      error: null,
+      doneTimeout: null
+    };
+    function loadStorage(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : fallback;
+      } catch (_) {
+        return fallback;
+      }
+    }
+    function saveStorage(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+    function getOrCreateUserId() {
+      let id = localStorage.getItem("user_id");
+      if (!id) {
+        id = "user_" + Math.random().toString(36).slice(2, 9);
+        localStorage.setItem("user_id", id);
+      }
+      return id;
+    }
+    function escapeHtml(value) {
+      return String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+    }
+    function computeLevel(semantic) {
+      if (semantic > 0.85) return "Perfect";
+      if (semantic > 0.7) return "Good";
+      if (semantic > 0.5) return "Close";
+      return "Far";
+    }
+    function typewriterHtml(text, speed) { return `<span class="typewriter" data-text="${escapeHtml(text)}" data-speed="${speed}"></span>`; }
+    function scoreRing(score) {
+      const pct = Math.min(score / 100, 1);
+      const r = 36;
+      const circ = 2 * Math.PI * r;
+      const dash = pct * circ;
+      const color = pct > 0.7 ? "#00ff9d" : pct > 0.4 ? "#ffb800" : "#ff4f6e";
+      return `<svg class="score-ring" viewBox="0 0 90 90" aria-hidden="true"><g transform="rotate(-90 45 45)"><circle cx="45" cy="45" r="36" fill="none" stroke="#1a1a2e" stroke-width="6"></circle><circle cx="45" cy="45" r="36" fill="none" stroke="${color}" stroke-width="6" stroke-dasharray="${dash} ${circ}" stroke-linecap="round" style="filter: drop-shadow(0 0 6px ${color}); transition: all 1s ease;"></circle></g><text x="45" y="50" text-anchor="middle" fill="#fff" font-size="14" font-family="'Share Tech Mono', monospace" font-weight="bold">${Math.round(pct * 100)}%</text></svg>`;
+    }
+    async function fetchQuestions(round, key) {
+      let url = `${API_BASE}/api/questions?round=${round}`;
+      if (round === 2 && key) url += `&key=${encodeURIComponent(key)}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        let err = { message: "Failed to fetch questions" };
+        try { err = await res.json(); } catch (_) {}
+        throw new Error(err.message || "Failed to fetch questions");
+      }
+      const data = await res.json();
+      return data.data || [];
+    }
+    async function submitPrompt(questionId, userPrompt) {
+      const body = {};
+      body[`q${questionId}`] = userPrompt;
+      const res = await fetch(`${API_BASE}/api/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-User-Id": state.userId },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      const r = data.results && data.results[0];
+      if (!r) throw new Error("Invalid response");
+      return {
+        status: r.status,
+        message: r.message,
+        semantic_score: r.score ? r.score.semantic_score : 0,
+        semantic_points: r.score ? r.score.semantic_points : 0,
+        difficulty_points: r.score ? r.score.difficulty_points : 0,
+        final_score: r.score ? r.score.final_score : 0,
+        keyword_score: r.score ? r.score.keyword : undefined,
+        structure_score: r.score ? r.score.structure : undefined,
+        level: computeLevel(r.score ? r.score.semantic_score : 0),
+        attempts: 1,
+        feedback: r.feedback || null,
+        output: r.output || null,
+        original_prompt: null
+      };
+    }
+    async function startGame() {
+      state.phase = "game";
+      state.questions = [];
+      state.results = {};
+      state.prompts = {};
+      state.totalScore = 0;
+      state.loadingId = null;
+      state.round2Unlocked = false;
+      state.error = null;
+      clearDoneTimeout();
+      render();
+      await loadRoundOne();
+    }
+    async function loadRoundOne() {
+      try {
+        state.questions = await fetchQuestions(1);
+        state.error = null;
+      } catch (_) {
+        state.error = "Cannot reach backend. Is Flask running on port 5000?";
+      }
+      render();
+    }
+    async function unlockRoundTwoIfNeeded() {
+      const solved = solvedCount();
+      const round1Completed = state.questions.length === 9 && solved === 9;
+      if (!round1Completed || state.round2Unlocked) return;
+      state.round2Unlocked = true;
+      render();
+      try {
+        const more = await fetchQuestions(2, "ROUND2_UNLOCK");
+        state.questions = state.questions.concat(more);
+        state.error = null;
+      } catch (_) {
+        state.error = "Failed to load Round 2";
+      }
+      render();
+      moveToDoneIfNeeded();
+    }
+    function clearDoneTimeout() {
+      if (state.doneTimeout) {
+        clearTimeout(state.doneTimeout);
+        state.doneTimeout = null;
+      }
+    }
+    function moveToDoneIfNeeded() {
+      if (state.questions.length > 0 && solvedCount() === TOTAL_QUESTIONS && state.phase === "game") {
+        clearDoneTimeout();
+        state.doneTimeout = setTimeout(() => {
+          state.phase = "done";
+          render();
+        }, 800);
+      }
+    }
+    async function handleSubmit(qid) {
+      const prompt = (state.prompts[qid] || "").trim();
+      if (!prompt || state.loadingId === qid) return;
+      state.loadingId = qid;
+      state.error = null;
+      render();
+      try {
+        const result = await submitPrompt(qid, prompt);
+        const prev = state.results[qid];
+        const updated = { ...result, attempts: (prev && prev.attempts ? prev.attempts : 0) + 1 };
+        if (result.status === "correct" && (!prev || prev.status !== "correct")) state.totalScore += result.final_score;
+        state.results[qid] = updated;
+      } catch (_) {
+        state.error = "Submission failed. Check your backend.";
+      } finally {
+        state.loadingId = null;
+      }
+      render();
+      await unlockRoundTwoIfNeeded();
+      moveToDoneIfNeeded();
+    }
+    function handleReplay() {
+      clearDoneTimeout();
+      state.phase = "intro";
+      state.playerName = "";
+      saveStorage("player_name", state.playerName);
+      state.questions = [];
+      state.results = {};
+      state.prompts = {};
+      state.totalScore = 0;
+      state.loadingId = null;
+      state.round2Unlocked = false;
+      state.error = null;
+      render();
+    }
+    function solvedCount() { return Object.values(state.results).filter((r) => r.status === "correct").length; }
+    function doneStats() {
+      const allResults = Object.values(state.results);
+      const totalAttempts = allResults.reduce((sum, r) => sum + (r.attempts || 0), 0);
+      const avgMatch = allResults.length ? Math.round((allResults.reduce((sum, r) => sum + (r.semantic_score || 0), 0) / allResults.length) * 100) : 0;
+      return { totalAttempts, avgMatch };
+    }
+    function renderHeader() {
+      if (state.phase === "intro") return "";
+      const solved = solvedCount();
+      const progress = state.questions.length ? (solved / state.questions.length) * 100 : 0;
+      return `<header class="site-header"><div class="logo"><span class="glitch-wrapper" data-text="PROMPT">PROMPT</span><span>DECODER</span></div><div class="header-stats"><div class="stat-pill"><span class="stat-val" style="color:#ffb800;">${Math.round(state.totalScore)}</span><span class="stat-key">SCORE</span></div><div class="stat-pill"><span class="stat-val">${solved}/${state.questions.length}</span><span class="stat-key">SOLVED</span></div><div style="display:flex; flex-direction:column; gap:4px; min-width:140px;"><div class="progress-bar-header"><div class="progress-bar-fill" style="width:${progress}%;"></div></div><span class="stat-key" style="text-align:right;">PROGRESS</span></div></div></header>`;
+    }
+    function renderIntro() {
+      return `<section class="intro-screen"><div class="intro-card"><span class="intro-icon">??</span><div class="intro-title"><span class="accent">PROMPT</span>DECODER</div><div class="intro-sub">// REVERSE ENGINEER THE HIDDEN PROMPT</div><p class="intro-desc">The system has been compromised. All you have are the <strong>outputs</strong> - the original prompts are lost.<br><br>Your mission: <strong>reverse-engineer the hidden prompt</strong> behind each response. Think like the model. Predict its intent. Decode its logic.<br><br>Every word matters. The closer your reconstruction, the higher your score - but be warned: ambiguity, misdirection, and edge cases stand in your way.</p><div class="rules-grid"><div class="rule-item"><span class="rule-icon">??</span> Booting semantic matcher... [OK]</div><div class="rule-item"><span class="rule-icon">?</span> Loading difficulty matrix... [OK]</div><div class="rule-item"><span class="rule-icon">??</span> Enabling hint system... [ACTIVE]</div><div class="rule-item"><span class="rule-icon">??</span> Syncing AI scoring engine... [LIVE]</div></div><input id="player-name" class="name-input" placeholder="Enter your hacker alias..." value="${escapeHtml(state.playerName)}" /><button id="start-btn" class="start-btn" ${state.playerName.trim() ? "" : "disabled"}>INITIALIZE SESSION &rarr;</button></div></section>`;
+    }
+    function renderCard(q, index) {
+      const result = state.results[q.id] || null;
+      const prompt = state.prompts[q.id] || "";
+      const diff = DIFFICULTY_CONFIG[q.difficulty] || DIFFICULTY_CONFIG.easy;
+      const isCorrect = result && result.status === "correct";
+      const cardClass = result ? (isCorrect ? "card-correct" : "card-wrong") : "";
+      const level = result ? (LEVEL_CONFIG[result.level] || LEVEL_CONFIG.Far) : LEVEL_CONFIG.Far;
+      const showCode = q.expected_output.includes("class") || q.expected_output.includes("import");
+      const warnings = [];
+      if (result && !isCorrect) {
+        if (typeof result.keyword_score === "number" && result.keyword_score < 0.5) warnings.push("Missing key terms");
+        if (typeof result.structure_score === "number" && result.structure_score < 0.5) warnings.push("Prompt structure is off");
+      }
+      return `<article class="question-card ${cardClass}" style="animation-delay:${index * 0.12}s;"><div class="card-header"><div class="card-meta"><span class="q-number">Q${q.id}</span><span class="difficulty-badge" style="color:${diff.color}; border-color:${diff.color}; box-shadow:0 0 8px ${diff.glow};">${diff.icon} ${escapeHtml(q.difficulty)}</span><span class="score-badge">+${q.score} pts</span></div>${result ? `<div class="result-badge" style="color:${isCorrect ? '#00ff9d' : '#ff4f6e'};">${escapeHtml(result.message)}</div>` : ""}</div><div class="expected-output"><div class="output-label"><span class="label-dot"></span>EXPECTED OUTPUT</div><div class="output-text">${showCode ? `<pre class="code-block"><code>${escapeHtml(q.expected_output)}</code></pre>` : `<span style="white-space:pre-line; font-weight:bold;">${escapeHtml(q.expected_output)}</span>`}</div></div><div class="input-section"><label class="input-label"><span style="color:#00ff9d;">&gt;</span> YOUR PROMPT</label><textarea class="prompt-input" data-qid="${q.id}" placeholder="Decode the hidden prompt..." rows="3" ${isCorrect ? "disabled" : ""}>${escapeHtml(prompt)}</textarea></div>${result ? `<div class="result-section"><div class="score-row">${scoreRing((result.semantic_score || 0) * 100)}<div class="score-details"><div class="score-item"><span class="score-label">Semantic Match:</span><span class="score-value" style="color:#00ff9d;">${Number(result.semantic_points || 0).toFixed(1)} pts</span></div><div class="score-item"><span class="score-label">Difficulty Bonus:</span><span class="score-value" style="color:#ffb800;">+${result.difficulty_points}</span></div><div class="score-item"><span class="score-label">Total:</span><span class="score-value" style="color:#fff;">${Number(result.final_score || 0).toFixed(1)} pts</span></div><div><div class="level-label">${escapeHtml(result.level)}</div><div class="level-bar-bg"><div class="level-bar-fill" style="width:${level.width}; background:${level.color}; box-shadow:0 0 10px ${level.color};"></div></div></div></div></div>${result.feedback ? `<div class="hint-box"><span class="hint-icon">??</span>${typewriterHtml(result.feedback, 18)}</div>` : ""}${warnings.length ? `<div class="warning-stack">${warnings.map((warning) => `<div>? ${escapeHtml(warning)}</div>`).join("")}<div class="warning-note">The response may lack semantic depth; consider refining the vocabulary.</div></div>` : ""}${isCorrect && result.output ? `<div class="success-output"><div class="output-label"><span class="label-dot" style="background:#00ff9d;"></span>OUTPUT VERIFIED ?</div><div class="unlocked-text">${typewriterHtml(result.output, 25)}</div></div>` : ""}</div>` : ""}<div class="card-footer">${result ? `<div class="attempt-info">Attempt #${result.attempts}</div>` : "<div></div>"}<button class="submit-btn ${isCorrect ? 'btn-disabled' : ''}" data-submit-qid="${q.id}" ${(isCorrect || state.loadingId === q.id || !prompt.trim()) ? "disabled" : ""}>${state.loadingId === q.id ? '<span class="btn-loading"><span></span><span></span><span></span></span>' : isCorrect ? '? DECODED' : 'DECODE ?'}</button></div></article>`;
+    }
+    function renderGame() {
+      const loading = !state.questions.length && !state.error;
+      return `<section class="game-layout"><div class="game-hero"><div class="game-title"><span class="accent"><span class="glitch-wrapper" data-text="DECODE">DECODE</span></span> THE PROMPTS</div><div class="player-tag">SESSION: <span>${escapeHtml(state.playerName.toUpperCase())}</span></div></div>${state.error ? `<div class="error-box">? ${escapeHtml(state.error)}</div>` : ""}${loading ? '<div class="loading-box">LOADING QUESTIONS...</div>' : ""}${!state.round2Unlocked ? '<div class="locked-box">?? ROUND 2 LOCKED<br><small>Complete all Round 1 questions to unlock</small></div>' : ""}<div class="cards-stack">${state.questions.map(renderCard).join("")}</div></section>`;
+    }
+    function renderDone() {
+      const stats = doneStats();
+      return `<section class="done-screen"><div class="done-card"><span class="done-icon">??</span><div class="done-title">MISSION COMPLETE</div><div class="done-sub">// ALL PROMPTS DECODED - ${escapeHtml(state.playerName.toUpperCase())}</div><div class="final-score-display">${Math.round(state.totalScore)}</div><div class="final-score-label">TOTAL SCORE</div><div class="done-stats"><div class="done-stat"><div class="val">${state.questions.length}</div><div class="key">DECODED</div></div><div class="done-stat"><div class="val">${stats.totalAttempts}</div><div class="key">ATTEMPTS</div></div><div class="done-stat"><div class="val">${stats.avgMatch}%</div><div class="key">AVG MATCH</div></div></div><button id="replay-btn" class="replay-btn">? NEW SESSION</button></div></section>`;
+    }
+    function render() {
+      const app = document.getElementById("app");
+      app.innerHTML = `${renderHeader()}${state.phase === "intro" ? renderIntro() : state.phase === "game" ? renderGame() : renderDone()}`;
+      bindEvents();
+      hydrateTypewriters();
+    }
+    function bindEvents() {
+      const playerInput = document.getElementById("player-name");
+      if (playerInput) {
+        playerInput.addEventListener("input", (event) => {
+          state.playerName = event.target.value;
+          saveStorage("player_name", state.playerName);
+          const startBtn = document.getElementById("start-btn");
+          if (startBtn) startBtn.disabled = !state.playerName.trim();
+        });
+        playerInput.addEventListener("keydown", async (event) => {
+          if (event.key === "Enter" && state.playerName.trim()) await startGame();
+        });
+      }
+      const startBtn = document.getElementById("start-btn");
+      if (startBtn) startBtn.addEventListener("click", startGame);
+      document.querySelectorAll(".prompt-input").forEach((node) => {
+        node.addEventListener("input", (event) => {
+          const qid = Number(event.target.dataset.qid);
+          state.prompts[qid] = event.target.value;
+          const button = document.querySelector(`[data-submit-qid="${qid}"]`);
+          if (button) button.disabled = !state.prompts[qid].trim() || !!(state.results[qid] && state.results[qid].status === "correct") || state.loadingId === qid;
+        });
+      });
+      document.querySelectorAll("[data-submit-qid]").forEach((button) => {
+        button.addEventListener("click", async (event) => {
+          const qid = Number(event.currentTarget.dataset.submitQid);
+          await handleSubmit(qid);
+        });
+      });
+      const replayBtn = document.getElementById("replay-btn");
+      if (replayBtn) replayBtn.addEventListener("click", handleReplay);
+    }
+    function hydrateTypewriters() {
+      document.querySelectorAll(".typewriter").forEach((node) => {
+        const text = node.dataset.text || "";
+        const speed = Number(node.dataset.speed || 20);
+        let index = 0;
+        node.textContent = "";
+        const timer = setInterval(() => {
+          node.textContent = text.slice(0, index + 1);
+          index += 1;
+          if (index >= text.length) clearInterval(timer);
+        }, speed);
+      });
+    }
+    function initParticles() {
+      const canvas = document.getElementById("particle-canvas");
+      const ctx = canvas.getContext("2d");
+      let width = 0;
+      let height = 0;
+      let raf = null;
+      const particles = [];
+      function reset() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+        particles.length = 0;
+        for (let i = 0; i < 60; i += 1) {
+          particles.push({ x: Math.random() * width, y: Math.random() * height, vx: (Math.random() - 0.5) * 0.4, vy: (Math.random() - 0.5) * 0.4, r: Math.random() * 1.5 + 0.5, alpha: Math.random() * 0.5 + 0.1 });
+        }
+      }
+      function draw() {
+        ctx.clearRect(0, 0, width, height);
+        particles.forEach((p) => {
+          p.x += p.vx; p.y += p.vy;
+          if (p.x < 0 || p.x > width) p.vx *= -1;
+          if (p.y < 0 || p.y > height) p.vy *= -1;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(0,255,157,${p.alpha})`;
+          ctx.fill();
+        });
+        for (let i = 0; i < particles.length; i += 1) {
+          for (let j = i + 1; j < particles.length; j += 1) {
+            const dx = particles[i].x - particles[j].x;
+            const dy = particles[i].y - particles[j].y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 120) {
+              ctx.beginPath();
+              ctx.moveTo(particles[i].x, particles[i].y);
+              ctx.lineTo(particles[j].x, particles[j].y);
+              ctx.strokeStyle = `rgba(0,255,157,${0.08 * (1 - dist / 120)})`;
+              ctx.stroke();
+            }
+          }
+        }
+        raf = requestAnimationFrame(draw);
+      }
+      reset();
+      draw();
+      window.addEventListener("resize", reset);
+      window.addEventListener("beforeunload", () => raf && cancelAnimationFrame(raf), { once: true });
+    }
+    initParticles();
+    render();
+  </script>
 </body>
 </html>
