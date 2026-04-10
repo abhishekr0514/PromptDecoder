@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { DIFFICULTY_CONFIG, LEVEL_CONFIG } from "../constants";
 import { ScoreRing, TypewriterText } from "./atoms";
 import type { Question, QuestionResult } from "../types";
@@ -6,13 +5,14 @@ import type { Question, QuestionResult } from "../types";
 interface Props {
   q: Question;
   index: number;
+  prompt: string;
+  onPromptChange: (qid: number, prompt: string) => void;
   onSubmit: (qid: number, prompt: string) => void;
   result: QuestionResult | null;
   loading: boolean;
 }
 
-export function QuestionCard({ q, index, onSubmit, result, loading }: Props) {
-  const [prompt, setPrompt] = useState("");
+export function QuestionCard({ q, index, prompt, onPromptChange, onSubmit, result, loading }: Props) {
   const diff = DIFFICULTY_CONFIG[q.difficulty] ?? DIFFICULTY_CONFIG["easy"];
   const isCorrect = result?.status === "correct";
 
@@ -66,7 +66,7 @@ export function QuestionCard({ q, index, onSubmit, result, loading }: Props) {
           className="prompt-input"
           placeholder="Decode the hidden prompt..."
           value={prompt}
-          onChange={e => setPrompt(e.target.value)}
+          onChange={e => onPromptChange(q.id, e.target.value)}
           rows={3}
           disabled={isCorrect}
         />

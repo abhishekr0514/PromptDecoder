@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import "./styles.css";
 import { fetchQuestions, submitPrompt } from "./api";
 import { ParticleBackground, GlitchText } from "./components/atoms";
@@ -17,49 +17,50 @@ export default function App() {
     }
     return id;
   });
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [results, setResults] = useState<Record<number, QuestionResult>>({});
-  const [totalScore, setTotalScore] = useState(0);
+  const [questions, setQuestions] = usePersistentState<Question[]>("questions", []);
+  const [results, setResults] = usePersistentState<Record<number, QuestionResult>>("results", {});
+  const [draftPrompts, setDraftPrompts] = usePersistentState<Record<number, string>>("draft_prompts", {});
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [phase, setPhase] = usePersistentState<Phase>("phase", "intro");
   const [playerName, setPlayerName] = usePersistentState("player_name", "");
+  const [round2Fetched, setRound2Fetched] = usePersistentState("round2_fetched", false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    setPhase("intro");
-  }, []);
 
   // Load questions when game starts
   useEffect(() => {
-    if (phase !== "game") return;
+    if (phase !== "game" || questions.length > 0) return;
     fetchQuestions(1)
       .then(setQuestions)
       .catch(() => setError("Cannot reach backend. Is Flask running on port 5000?"));
-  }, [phase]);
+  }, [phase, questions.length, setQuestions]);
 
   // Auto-advance to done screen when all solved
   const solved = Object.values(results).filter(r => r.status === "correct").length;
   const round1Completed = questions.length === 9 && solved === 9;
-  const [round2Unlocked, setRound2Unlocked] = useState(false);
+  const totalScore = Object.values(results).reduce((score, result) => {
+    return result.status === "correct" ? score + result.final_score : score;
+  }, 0);
+  const round2Unlocked = questions.length > 9 || round2Fetched;
   useEffect(() => {
-    if (round1Completed && !round2Unlocked) {
-      setRound2Unlocked(true);
+    if (!round1Completed || round2Fetched) return;
 
-      // 🔓 fetch round 2
-      fetchQuestions(2, "ROUND2_UNLOCK")
-        .then((newQs) => {
-          setQuestions(prev => [...prev, ...newQs]); // append
-        })
-        .catch(() => setError("Failed to load Round 2"));
-    }
-  }, [round1Completed, round2Unlocked]);
+    // 🔓 fetch round 2
+    fetchQuestions(2, "ROUND2_UNLOCK")
+      .then((newQs) => {
+        setQuestions(prev => [...prev, ...newQs]);
+        setRound2Fetched(true);
+      })
+      .catch(() => setError("Failed to load Round 2"));
+  }, [round1Completed, round2Fetched, setQuestions, setRound2Fetched]);
 
   const TOTAL_QUESTIONS = 12;
 
   useEffect(() => {
     if (questions.length > 0 && solved === TOTAL_QUESTIONS && phase === "game") {
-      setTimeout(() => setPhase("done"), 800);
+      const timeoutId = window.setTimeout(() => setPhase("done"), 800);
+      return () => window.clearTimeout(timeoutId);
     }
-  }, [solved, questions.length, phase]);
+  }, [solved, questions.length, phase, setPhase]);
 
   const handleSubmit = async (qid: number, prompt: string) => {
     setLoadingId(qid);
@@ -69,11 +70,10 @@ export default function App() {
       const updatedResult: QuestionResult = {
         ...result,
         attempts: (prev?.attempts ?? 0) + 1,
+        original_prompt: prompt,
       };
       setResults(prev => ({ ...prev, [qid]: updatedResult }));
-      if (result.status === "correct") {
-        setTotalScore(prev => prev + result.final_score);
-      }
+      setDraftPrompts(prev => ({ ...prev, [qid]: prompt }));
     } catch {
       setError("Submission failed. Check your backend.");
     } finally {
@@ -81,12 +81,17 @@ export default function App() {
     }
   };
 
+  const handlePromptChange = (qid: number, prompt: string) => {
+    setDraftPrompts(prev => ({ ...prev, [qid]: prompt }));
+  };
+
   const handleReplay = () => {
     setResults({});
-    setTotalScore(0);
     setPhase("intro");
     setPlayerName("");
     setQuestions([]);
+    setDraftPrompts({});
+    setRound2Fetched(false);
     setError(null);
   };
 
@@ -177,6 +182,8 @@ export default function App() {
                   key={q.id}
                   q={q}
                   index={i}
+                  prompt={draftPrompts[q.id] ?? results[q.id]?.original_prompt ?? ""}
+                  onPromptChange={handlePromptChange}
                   onSubmit={handleSubmit}
                   result={results[q.id] ?? null}
                   loading={loadingId === q.id}
